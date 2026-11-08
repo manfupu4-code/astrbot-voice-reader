@@ -8,6 +8,7 @@ config.json
 state.json
 stop.flag
 voices_cache.json
+autostart.vbs
 reader.log
 reader.log.1
 /screenshot*.png
