@@ -19,6 +19,7 @@ BG = "#1e1f22"
 PANEL = "#2b2d31"
 FG = "#e6e6e6"
 ACC = "#4a9eff"
+YELLOW = "#ffd54f"          # 音色区域高亮色
 MUTED = "#8b8d91"
 
 STATUS_COLOR = {
@@ -87,6 +88,18 @@ class Panel(tk.Tk):
         st.configure("Treeview.Heading", background="#33363b", foreground=FG)
         st.map("Treeview", background=[("selected", "#1d4d80")])
         st.configure("TCombobox", fieldbackground=PANEL, background="#33363b", foreground=FG)
+        # 音色区域：黄色高亮
+        st.configure("Voice.TCombobox", fieldbackground=PANEL, background="#33363b",
+                     foreground=YELLOW, arrowcolor=YELLOW, borderwidth=1)
+        st.map("Voice.TCombobox",
+               fieldbackground=[("readonly", PANEL), ("active", PANEL)],
+               foreground=[("readonly", YELLOW), ("active", YELLOW)],
+               arrowcolor=[("active", YELLOW)])
+        # 下拉列表配色
+        self.option_add("*TCombobox*Listbox.background", PANEL)
+        self.option_add("*TCombobox*Listbox.foreground", YELLOW)
+        self.option_add("*TCombobox*Listbox.selectBackground", ACC)
+        self.option_add("*TCombobox*Listbox.selectForeground", "#ffffff")
 
     # ---------- 顶部 ----------
     def _top(self) -> None:
@@ -137,8 +150,8 @@ class Panel(tk.Tk):
         # 音色
         row = tk.Frame(box, bg=BG)
         row.pack(fill="x", padx=10, pady=5)
-        tk.Label(row, text="音色", bg=BG, fg=FG, width=9, anchor="w",
-                 font=("Microsoft YaHei UI", 10)).pack(side="left")
+        tk.Label(row, text="音色", bg=BG, fg=YELLOW, width=9, anchor="w",
+                 font=("Microsoft YaHei UI", 10, "bold")).pack(side="left")
 
         self.SYSTEM_LABEL = "系统语音 · 离线 · 机械"
         self._catalog = voice_catalog.get_catalog(self.cfg.get("custom_voices") or [])
@@ -147,13 +160,13 @@ class Panel(tk.Tk):
         cur_label = voice_catalog.label_of(cur_id, self._catalog) if cur_id else self.SYSTEM_LABEL
         self.v_voice = tk.StringVar(value=cur_label)
         self.cb_voice = ttk.Combobox(row, textvariable=self.v_voice, values=labels,
-                                     state="readonly", width=26,
-                                     font=("Microsoft YaHei UI", 10))
+                                     state="readonly", width=26, style="Voice.TCombobox",
+                                     font=("Microsoft YaHei UI", 10, "bold"))
         self.cb_voice.pack(side="left")
         self.cb_voice.bind("<<ComboboxSelected>>", self.on_voice)
         ttk.Button(row, text="刷新音色", width=9, command=self.on_refresh_voices).pack(
             side="left", padx=6)
-        tk.Label(row, text="需联网；失败自动回退系统语音", bg=BG, fg="#6b6d70",
+        tk.Label(row, text="需联网；失败自动回退系统语音", bg=BG, fg="#c9a227",
                  font=("Microsoft YaHei UI", 9)).pack(side="left", padx=6)
 
         # 按钮
