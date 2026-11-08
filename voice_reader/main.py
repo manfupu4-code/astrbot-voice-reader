@@ -14,6 +14,25 @@ from .player import DbWatcher, HotkeyWatcher, VoiceCore, Watchdog, log
 from . import voices as voice_catalog
 
 
+_MUTEX_HANDLE = None
+
+
+def acquire_single_instance() -> bool:
+    """单实例保护：避免多个进程抢同一个 state.json"""
+    global _MUTEX_HANDLE
+    try:
+        import ctypes
+
+        kernel32 = ctypes.windll.kernel32
+        _MUTEX_HANDLE = kernel32.CreateMutexW(None, False, "Local\\astrbot_voice_reader_mutex")
+        ERROR_ALREADY_EXISTS = 183
+        if kernel32.GetLastError() == ERROR_ALREADY_EXISTS:
+            return False
+        return True
+    except Exception:
+        return True          # 非 Windows 或调用失败时不阻塞启动
+
+
 def _bootstrap(cfg: Config, db_override: str) -> Path | None:
     db = find_database(db_override or cfg.get("db_path", ""))
     if db is None:
@@ -129,6 +148,11 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.list_voices:
         return cmd_list_voices(refresh=args.refresh_voices)
+
+    if not acquire_single_instance():
+        log("✗ 已经有一个朗读器在运行，本进程退出")
+        log("  如需重启，请先结束原进程（任务管理器 → python.exe）")
+        return 3
 
     if args.test:
         return cmd_test(cfg)
