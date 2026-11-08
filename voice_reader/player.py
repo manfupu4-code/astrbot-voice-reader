@@ -274,25 +274,45 @@ class DbWatcher(threading.Thread):
             log("尚未找到会话，等待中…")
 
         interval = float(self.cfg.get("poll_interval", 0.4))
+        settle = 1.5          # 静默判定：这么久没新增，才认为这一轮写完了
+
+        committed = int(state.get("turn", 0))   # 已入队的轮数
+        pending_cnt = committed                 # 观察到的最新轮数
+        last_grow = 0.0
+
         while not self.core.quit:
             try:
                 got = db_source.fetch_latest_conversation(self.db)
                 if got:
                     cid, messages = got
                     turns = db_source.assistant_turns(messages)
+
                     if state.get("conv") != cid:
                         state = {"conv": cid, "turn": 0}
-                    done = int(state.get("turn", 0))
-                    if len(turns) < done:            # 上下文被裁剪
-                        done = len(turns)
-                        state["turn"] = done
-                    elif len(turns) > done:
-                        # 同一次轮询里的多条新消息 = 同一轮回复（工具调用会拆成多条）
-                        batch = [p for t in turns[done:] for p in t]
-                        if batch:
-                            self.core.add_turn(batch)
-                        state["turn"] = len(turns)
+                        committed = pending_cnt = 0
                         self._save_state(state)
+
+                    total = len(turns)
+
+                    # 上下文被裁剪：重新对齐
+                    if total < committed:
+                        committed = pending_cnt = total
+                        state["turn"] = total
+                        self._save_state(state)
+
+                    if total > committed:
+                        # 还在增长 -> 重置静默计时
+                        if total != pending_cnt:
+                            pending_cnt = total
+                            last_grow = time.time()
+                        # 静默够了才整轮入队，避免"念一半被打断"
+                        elif time.time() - last_grow >= settle:
+                            batch = [p for t in turns[committed:pending_cnt] for p in t]
+                            if batch:
+                                self.core.add_turn(batch)
+                            committed = pending_cnt
+                            state["turn"] = committed
+                            self._save_state(state)
             except Exception as e:
                 log(f"轮询异常: {e}")
             time.sleep(interval)

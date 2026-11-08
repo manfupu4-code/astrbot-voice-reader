@@ -40,7 +40,7 @@
 ### 三步
 
 ```bash
-git clone https://github.com/<your-name>/astrbot-voice-reader.git
+git clone https://github.com/manfupu4-code/astrbot-voice-reader.git
 cd astrbot-voice-reader
 ```
 
