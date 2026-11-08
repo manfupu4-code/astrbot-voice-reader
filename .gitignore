@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+tts_cache/
+config.json
+state.json
+stop.flag
+reader.log
+reader.log.1
+/screenshot*.png
+!docs/screenshot.png
+.DS_Store
+Thumbs.db

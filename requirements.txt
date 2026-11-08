@@ -1,0 +1,6 @@
+# 运行依赖
+edge-tts>=6.1.0        # 在线神经语音（音质接近真人，需要联网）
+pygame>=2.5.0          # 播放 mp3
+pycaw>=20240210        # 控制系统主音量（仅 Windows）
+comtypes>=1.2.0        # pycaw 依赖
+pywin32>=306           # 系统 SAPI 语音（仅 Windows）
