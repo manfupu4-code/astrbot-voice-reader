@@ -11,6 +11,7 @@ from .config import Config
 from .db_source import find_database
 from .engines import create_engine
 from .player import DbWatcher, HotkeyWatcher, VoiceCore, Watchdog, log
+from . import voices as voice_catalog
 
 
 def _bootstrap(cfg: Config, db_override: str) -> Path | None:
@@ -21,6 +22,25 @@ def _bootstrap(cfg: Config, db_override: str) -> Path | None:
         return None
     log(f"数据库: {db}")
     return db
+
+
+def cmd_list_voices(refresh: bool = False) -> int:
+    """列出可用音色"""
+    if refresh:
+        ok, msg = voice_catalog.refresh()
+        log(msg)
+        if not ok:
+            log("使用离线内置列表")
+    catalog = voice_catalog.get_catalog()
+    zh = [v for v in catalog if v["locale"].startswith("zh")]
+    print(f"\n共 {len(catalog)} 个音色，其中中文 {len(zh)} 个：\n")
+    for v in zh:
+        print(f"  {v['id']:<34} {v['label']}")
+    others = len(catalog) - len(zh)
+    if others:
+        print(f"\n  另有 {others} 个其他语种音色，可用 --list-voices 查看全部后手动指定")
+    print()
+    return 0
 
 
 def cmd_test(cfg: Config) -> int:
@@ -92,6 +112,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--volume", type=int, default=None, help="系统音量 0-100")
     p.add_argument("--no-gui", action="store_true", help="不启动面板，纯后台运行")
     p.add_argument("--test", action="store_true", help="自检：播报一句测试语音后退出")
+    p.add_argument("--list-voices", action="store_true", help="列出可用音色")
+    p.add_argument("--refresh-voices", action="store_true",
+                   help="联网刷新音色列表（配合 --list-voices 使用）")
     p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     return p
 
@@ -103,6 +126,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.voice is not None:
         cfg["voice"] = args.voice.strip()
         cfg.save()
+
+    if args.list_voices:
+        return cmd_list_voices(refresh=args.refresh_voices)
 
     if args.test:
         return cmd_test(cfg)

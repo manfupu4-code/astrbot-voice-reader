@@ -7,7 +7,8 @@ import tkinter as tk
 from tkinter import ttk
 
 from .config import Config
-from .engines import EDGE_VOICES, SapiEngine
+from .engines import SapiEngine
+from . import voices as voice_catalog
 from .player import (
     ST_CANCELED, ST_DONE, ST_ERROR, ST_PENDING, ST_READING,
     ST_STOPPED, ST_TIMEOUT, VoiceCore, log,
@@ -138,17 +139,22 @@ class Panel(tk.Tk):
         row.pack(fill="x", padx=10, pady=5)
         tk.Label(row, text="音色", bg=BG, fg=FG, width=9, anchor="w",
                  font=("Microsoft YaHei UI", 10)).pack(side="left")
-        self._labels = list(EDGE_VOICES.keys())
-        self._ids = list(EDGE_VOICES.values())
-        cur = self.cfg.get("voice") or ""
-        self.v_voice = tk.StringVar(
-            value=self._labels[self._ids.index(cur)] if cur in self._ids else self._labels[0])
-        cb = ttk.Combobox(row, textvariable=self.v_voice, values=self._labels,
-                          state="readonly", width=24, font=("Microsoft YaHei UI", 10))
-        cb.pack(side="left")
-        cb.bind("<<ComboboxSelected>>", self.on_voice)
-        tk.Label(row, text="（需联网；失败自动回退系统语音）", bg=BG, fg="#6b6d70",
-                 font=("Microsoft YaHei UI", 9)).pack(side="left", padx=10)
+
+        self.SYSTEM_LABEL = "系统语音 · 离线 · 机械"
+        self._catalog = voice_catalog.get_catalog(self.cfg.get("custom_voices") or [])
+        labels = [self.SYSTEM_LABEL] + [v["label"] for v in self._catalog]
+        cur_id = self.cfg.get("voice") or ""
+        cur_label = voice_catalog.label_of(cur_id, self._catalog) if cur_id else self.SYSTEM_LABEL
+        self.v_voice = tk.StringVar(value=cur_label)
+        self.cb_voice = ttk.Combobox(row, textvariable=self.v_voice, values=labels,
+                                     state="readonly", width=26,
+                                     font=("Microsoft YaHei UI", 10))
+        self.cb_voice.pack(side="left")
+        self.cb_voice.bind("<<ComboboxSelected>>", self.on_voice)
+        ttk.Button(row, text="刷新音色", width=9, command=self.on_refresh_voices).pack(
+            side="left", padx=6)
+        tk.Label(row, text="需联网；失败自动回退系统语音", bg=BG, fg="#6b6d70",
+                 font=("Microsoft YaHei UI", 9)).pack(side="left", padx=6)
 
         # 按钮
         row = tk.Frame(box, bg=BG)
@@ -228,11 +234,32 @@ class Panel(tk.Tk):
 
     def on_voice(self, _=None) -> None:
         label = self.v_voice.get()
-        vid = EDGE_VOICES.get(label)
-        if vid:
-            self.cfg["voice"] = vid
+        if label == self.SYSTEM_LABEL:
+            self.cfg["voice"] = ""
             self.cfg.save()
-            log(f"切换音色 -> {label}")
+            log("切换音色 -> 系统语音（离线）")
+            return
+        for v in self._catalog:
+            if v["label"] == label:
+                self.cfg["voice"] = v["id"]
+                self.cfg.save()
+                log(f"切换音色 -> {label} ({v['id']})")
+                return
+
+    def on_refresh_voices(self) -> None:
+        """在线拉取完整音色列表"""
+        def work():
+            ok, msg = voice_catalog.refresh()
+            def apply():
+                if ok:
+                    self._catalog = voice_catalog.get_catalog(self.cfg.get("custom_voices") or [])
+                    self.cb_voice["values"] = [self.SYSTEM_LABEL] + [v["label"] for v in self._catalog]
+                    self.v_voice.set(voice_catalog.label_of(self.cfg.get("voice") or "", self._catalog))
+                log(f"刷新音色：{msg}")
+            self.after(0, apply)
+
+        import threading
+        threading.Thread(target=work, daemon=True).start()
 
     def toggle_pause(self) -> None:
         self.core.paused = not self.core.paused

@@ -7,6 +7,7 @@ tts_cache/
 config.json
 state.json
 stop.flag
+voices_cache.json
 reader.log
 reader.log.1
 /screenshot*.png

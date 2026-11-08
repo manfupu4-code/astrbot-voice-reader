@@ -15,6 +15,7 @@ DEFAULTS: Dict[str, Any] = {
     "db_path": "",
     # 朗读
     "voice": "zh-CN-XiaoyiNeural",   # 为空字符串则使用系统 SAPI
+    "custom_voices": [],             # 自定义音色，格式 [{"id": "...", "label": "..."}]
     "volume": 80,                    # 系统主音量 0-100
     "gap": 0.0,                      # 上一段念完到下一段的间隔（秒）
     "max_sec": 7.0,                  # 单段最多朗读时长（秒，按整句断）
