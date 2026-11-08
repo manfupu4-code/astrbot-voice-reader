@@ -2,6 +2,8 @@
 
 > 让 AstrBot 真的开口说话。不是把文字念一遍那种敷衍，是能打断、能限时、能挑音色的那种。
 
+> **⚠️ 先说清楚**：本项目**不含任何语音模型**。声音来自微软 Edge 的在线语音服务（通过 [edge-tts](https://github.com/rany2/edge-tts) 调用），离线时回退到 Windows 系统语音。详见 [依赖与致谢](#依赖与致谢)。
+
 ![panel](docs/screenshot.png)
 
 ---
@@ -116,6 +118,8 @@ python -m voice_reader.main --volume 60
 
 ## 音色
 
+下面这些音色**全部来自微软**（Edge 浏览器的在线语音服务），不是本项目训练的模型：
+
 | 名称 | ID | 特点 |
 |---|---|---|
 | 晓伊 | `zh-CN-XiaoyiNeural` | 女·活泼（默认） |
@@ -172,6 +176,27 @@ data_v4.db (只读)
   "log_max_mb": 5
 }
 ```
+
+---
+
+## 依赖与致谢
+
+**先说清楚：这个项目自己不含任何语音模型。** 它只是个「调度器」——把对话内容取出来、切好、送进别人做好的语音引擎。
+
+| 组件 | 项目 | 作用 | 许可 |
+|---|---|---|---|
+| **语音合成（默认）** | [edge-tts](https://github.com/rany2/edge-tts) | 调用微软 Edge 浏览器内置的在线神经语音服务 | MIT |
+| **语音合成（离线回退）** | Windows SAPI（Microsoft Huihui） | 系统自带语音，无需联网 | 随 Windows |
+| 音频播放 | [pygame](https://github.com/pygame/pygame) | 播放 mp3 | LGPL |
+| 音量控制 | [pycaw](https://github.com/AndreMiras/pycaw) | 调用 Windows Core Audio API | MIT |
+| COM 桥接 | [comtypes](https://github.com/enthought/comtypes) / [pywin32](https://github.com/mhammond/pywin32) | 访问系统语音接口 | MIT / PSF |
+
+**关于 edge-tts 要说明的两点：**
+
+1. 它本身是 MIT 开源，但它调用的是**微软 Edge 的在线语音服务**，那是微软的资产。请自行确认你的使用场景符合微软的服务条款。
+2. 断网、被限流、或者服务端改了接口，都会导致合成失败——所以做了自动回退到系统语音的兜底。
+
+如果你不想要联网依赖，把 `config.json` 里的 `voice` 改成空字符串，就只用系统语音，全程离线。
 
 ---
 
