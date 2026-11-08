@@ -111,6 +111,14 @@ class VoiceCore:
         for p in paras:
             self.add(p)
 
+    def append_turn(self, paras: list[str]) -> None:
+        """同一条回复的后续内容：只追加，不打断正在朗读的部分"""
+        if not paras:
+            return
+        log(f"+++++ 同一轮内容补充，追加 {len(paras)} 段 +++++")
+        for p in paras:
+            self.add(p)
+
     def get(self, seq: int) -> Optional[dict]:
         with self.lock:
             for it in self.items:
@@ -231,7 +239,15 @@ class VoiceCore:
                 self.log(f"已播 {played:.1f}s 达到 {max_sec:.1f}s 上限 "
                          f"-> 停在句子边界 ({i}/{len(chunks)} 句)")
                 return ST_TIMEOUT
-            played += float(engine.speak(chunk, self.stop_evt) or 0.0)
+            try:
+                played += float(engine.speak(chunk, self.stop_evt) or 0.0)
+            except Exception as e:
+                self.log(f"朗读失败 [{type(e).__name__}] {e!r}，重试一次")
+                time.sleep(0.4)
+                try:
+                    played += float(engine.speak(chunk, self.stop_evt) or 0.0)
+                except Exception as e2:
+                    self.log(f"重试仍失败 [{type(e2).__name__}] {e2!r}，跳过该句")
             if self.stop_evt.is_set():
                 return ST_STOPPED
         return ST_DONE
@@ -267,7 +283,8 @@ class DbWatcher(threading.Thread):
         if got:
             cid, messages = got
             turns = db_source.assistant_turns(messages)
-            state = {"conv": cid, "turn": len(turns)}
+            users = sum(1 for m in messages if isinstance(m, dict) and m.get("role") == "user")
+            state = {"conv": cid, "turn": len(turns), "users": users}
             self._save_state(state)
             log(f"起点已定位：历史 {len(turns)} 轮（不朗读）")
         else:
@@ -300,18 +317,33 @@ class DbWatcher(threading.Thread):
                         state["turn"] = total
                         self._save_state(state)
 
+                    # 用户消息条数：用来判断是"换话题"还是"同一条回复的补充"
+                    user_cnt = sum(
+                        1 for m in messages
+                        if isinstance(m, dict) and m.get("role") == "user"
+                    )
+                    prev_user = int(state.get("users", user_cnt))
+
                     if total > committed:
-                        # 还在增长 -> 重置静默计时
                         if total != pending_cnt:
                             pending_cnt = total
                             last_grow = time.time()
-                        # 静默够了才整轮入队，避免"念一半被打断"
                         elif time.time() - last_grow >= settle:
                             batch = [p for t in turns[committed:pending_cnt] for p in t]
                             if batch:
-                                self.core.add_turn(batch)
+                                if user_cnt > prev_user:
+                                    # 用户发了新消息 -> 换话题，清空重念
+                                    self.core.add_turn(batch)
+                                else:
+                                    # 同一条回复的补充 -> 追加，不打断
+                                    self.core.append_turn(batch)
                             committed = pending_cnt
                             state["turn"] = committed
+                            state["users"] = user_cnt
+                            self._save_state(state)
+                    else:
+                        if user_cnt != prev_user:
+                            state["users"] = user_cnt
                             self._save_state(state)
             except Exception as e:
                 log(f"轮询异常: {e}")
