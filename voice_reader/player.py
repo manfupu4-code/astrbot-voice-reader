@@ -99,6 +99,7 @@ class VoiceCore:
 
         self.quit = False
         self._reading_since = 0.0
+        self._pet_idle = True
         self._reading_seq = 0
         self.engine: Optional[BaseEngine] = None
         self._engine_voice: Optional[str] = None
@@ -200,6 +201,10 @@ class VoiceCore:
             try:
                 seq = self._pending.get(timeout=0.2)
             except pyqueue.Empty:
+                # 队列空了才通知桌宠回待机，避免段落之间反复切换导致闪烁
+                if not self._pet_idle:
+                    pet_mode("idle")
+                    self._pet_idle = True
                 self._consume_stop_flag()
                 continue
 
@@ -209,6 +214,7 @@ class VoiceCore:
 
             self.stop_evt.clear()
             pet_mode("speak")
+            self._pet_idle = False
             item["status"] = ST_READING
             self._reading_since = time.time()
             self._reading_seq = seq
@@ -221,7 +227,6 @@ class VoiceCore:
                 self.log(f"朗读异常: {e}")
                 reason = ST_ERROR
 
-            pet_mode("idle")
             item["status"] = reason
             self._reading_since = 0.0
             self.log(f"#{seq} -> {reason}")
