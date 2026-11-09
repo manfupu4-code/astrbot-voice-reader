@@ -61,6 +61,24 @@ class Log:
 log = Log()
 
 
+def pet_mode(mode: str) -> None:
+    """通知桌宠当前状态（speak / idle）；未配置或失败时静默忽略"""
+    path = os.environ.get("PET_MODE_FILE") or ""
+    if not path:
+        try:
+            from .config import Config
+            path = Config.load().get("pet_mode_file", "") or ""
+        except Exception:
+            path = ""
+    if not path:
+        return
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(mode)
+    except OSError:
+        pass
+
+
 # ---------------------------------------------------------
 #  播放核心
 # ---------------------------------------------------------
@@ -190,6 +208,7 @@ class VoiceCore:
                 continue
 
             self.stop_evt.clear()
+            pet_mode("speak")
             item["status"] = ST_READING
             self._reading_since = time.time()
             self._reading_seq = seq
@@ -202,6 +221,7 @@ class VoiceCore:
                 self.log(f"朗读异常: {e}")
                 reason = ST_ERROR
 
+            pet_mode("idle")
             item["status"] = reason
             self._reading_since = 0.0
             self.log(f"#{seq} -> {reason}")

@@ -25,6 +25,7 @@ DEFAULTS: Dict[str, Any] = {
     "hotkey": "shift+win+e",         # 静音热键
     "poll_interval": 0.4,            # 数据库轮询间隔（秒）
     "log_max_mb": 5,                 # 日志超过此大小自动轮转
+    "pet_mode_file": "",             # 桌宠状态文件路径（留空=不联动）
 }
 
 
